@@ -21,9 +21,6 @@ parser.add_option("-r", "--regex", dest="regex",
     default=None)
 (options, args) = parser.parse_args()
 
-class Vote(object):
-    '''Represents a single vote.'''
-
 # Usage message
 if len(args) < 3:
     parser.error("Not enough arguments were supplied")
@@ -55,6 +52,12 @@ class Vote(object):
             return self.preferences[0]
         else:
             return None
+
+    def dup(self):
+        '''Returns a duplicate of self.'''
+        ret = Vote(None, None, None, None, do_nothing=True)
+        ret.preferences = self.preferences
+        return ret
 
     def filter(self, titles):
         '''Produces a NEW Vote object with only titles in the preference list.'''
@@ -113,14 +116,23 @@ def instant_runoff(votes, verbose=True, recursion_limit=3):
             if verbose:
                 print("NOTICE: Using recursive call to determine who to " \
                     "eliminate.")
-            votes_prime = []
-            for vote in votes:
-                vote_prime = vote.filter(losers)
-                if vote_prime:
+            sub_result = None
+            for this_loser in losers:
+                votes_prime = []
+                for vote in votes:
+                    vote_prime = vote.dup()
+                    vote_prime.remove(this_loser)
                     votes_prime.append(vote_prime)
-            sub_results = instant_runoff(votes_prime, verbose=False,
-                    recursion_limit=recursion_limit-1)
-            loser = sub_results[-1]
+                this_sub_result = instant_runoff(votes_prime, verbose=False,
+                        recursion_limit=recursion_limit-1)[0]
+                if sub_result == None:
+                    sub_result = this_sub_result
+                elif sub_result != this_sub_result:
+                    print("WARNING: Winner will be different based on who " \
+                            "is eliminated now. Take results with grain " \
+                            "of salt")
+                    break
+            loser = losers[0]
 
         else:
             print("ERROR: could not figure out who to eliminate")
