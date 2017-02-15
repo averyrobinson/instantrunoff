@@ -12,16 +12,19 @@ import re
 
 # Options and usage
 usage = "%prog [options] file i j\n" \
-    "    `file` is the CSV file from Google Forms\n" \
-    "    `i` is the index of the first results column\n" \
+    "    `file` is the CSV file from Google Forms.\n" \
+    "    `i` is the index of the first results column.\n" \
     "    `j` is the index of the last results column."
 parser = OptionParser(usage=usage)
-parser.add_option("-r", "--regex", dest="regex",
-        help="A regular expression to find the relevant part of the option name",
-        default=None)
+parser.add_option("-p", "--pattern", dest="regex",
+        help="A regular expression to find the relevant part of the option " \
+        "name.", default=None)
 parser.add_option("-d", "--depth", dest="recursion_limit",
         help="Integer. The maximum depth of recursion to use to break ties " \
         "for last. Cannot be set less than 1.", default=None)
+parser.add_option("-r", "--reckless", action="store_true", dest="reckless",
+        help="This option hurts democracy. When running under reckless mode " \
+        "ties are broken in a non-deterministic way.", default=False)
 (options, args) = parser.parse_args()
 
 # Usage message
@@ -72,11 +75,16 @@ class Vote(object):
         else:
             return None
 
-def instant_runoff(votes, verbose=True, recursion_limit=5):
+def instant_runoff(votes, verbose=True, recursion_limit=5, reckless=False):
     '''Actually does the instant-runoff process.'''
     n = len(votes)
     round = 1
     results = []
+
+    # Reckless warning
+    if reckless and verbose:
+        print("WARNING: You are using the --reckless option. Results may not " \
+                "be well-defined.")
 
     while 1:
         tally = {}
@@ -89,7 +97,7 @@ def instant_runoff(votes, verbose=True, recursion_limit=5):
         if verbose:
             print("Round {}:".format(round))
             for k, v in tally.items():
-                print("    {}: {} votes".format(k, v))
+                print("    {}:\t{} votes".format(k, v))
 
         # Find if there is a majority
         for k, v in tally.items():
@@ -113,15 +121,21 @@ def instant_runoff(votes, verbose=True, recursion_limit=5):
         if len(losers) == 1:
             loser = losers[0]
 
-        # Multiple losers, but out of recursion
-        elif len(losers) > 1 and recursion_limit == 0:
+        # Reckless
+        elif len(losers) > 1 and reckless:
             loser = losers[0]
-            print("WARNING: Loser picked arbitrarily because recursion " \
-                    "limit reached")
+
+        # Multiple losers, but out of recursion
+        elif len(losers) > 1 and recursion_limit == 0 and not reckless:
+            if verbose:
+                print("ERROR: Out of recursion and still cannot determine" \
+                        " winner.")
+            return None
 
         # Multiple losers, but we can recurse
-        elif len(losers) > 1 and recursion_limit > 0:
+        elif len(losers) > 1 and recursion_limit > 0 and not reckless:
             sub_result = None
+            changed = False
             for this_loser in losers:
                 votes_prime = []
                 for vote in votes:
@@ -129,7 +143,7 @@ def instant_runoff(votes, verbose=True, recursion_limit=5):
                     vote_prime.remove(this_loser)
                     votes_prime.append(vote_prime)
                 this_sub_results = instant_runoff(votes_prime, verbose=False,
-                        recursion_limit=recursion_limit-1)
+                        recursion_limit=recursion_limit-1, reckless=reckless)
                 if this_sub_results != None and len(this_sub_results) >= 1:
                     this_sub_result = this_sub_results[0]
                 else:
@@ -137,19 +151,17 @@ def instant_runoff(votes, verbose=True, recursion_limit=5):
                 if sub_result == None:
                     sub_result = this_sub_result
                 elif sub_result != this_sub_result:
-                    if verbose:
-                        print("ERROR: Instant-runoff failed. Winner " \
-                                "cannot be determined.")
-                    return None
+                    sub_result = None
+                    break
+
+            if sub_result != None:
+                loser = losers[0]
             else:
-                if sub_result == None:
-                    if verbose:
-                        print("ERROR: Instant-runoff failed. Winner " \
-                                "cannot be determined.")
-                    return None
-                elif verbose:
-                    print("Loser found here through recursive calls.")
-            loser = losers[0]
+                if verbose:
+                    print("ERROR: Instant-runoff failed. Winner " \
+                            "cannot be determined.")
+                    print("       Run with --reckless to see results anyway.")
+                return None
 
         else:
             print("ERROR: this should never happen")
@@ -191,8 +203,9 @@ with open(filename, 'r') as f:
     for line in reader:
         votes.append(Vote(titles, i, j, line))
 
+args = {}
 if options.recursion_limit != None and int(options.recursion_limit) >= 1:
-    recursion_limit = int(options.recursion_limit)
-    instant_runoff(votes, recursion_limit=recursion_limit)
-else:
-    instant_runoff(votes)
+    args['recursion_limit'] = int(options.recursion_limit)
+args['reckless'] = options.reckless
+
+instant_runoff(votes, **args)
