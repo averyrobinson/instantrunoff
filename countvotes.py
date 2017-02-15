@@ -163,7 +163,11 @@ with open(filename, 'r') as f:
         new_titles = []
         for title in titles:
             m = re.search(options.regex, title)
-            new_titles.append(m.group(0))
+            if m:
+                new_title = m.group(0)
+            else:
+                new_title = title
+            new_titles.append(new_title)
         titles = new_titles
 
     # Iterate over remaining lines
