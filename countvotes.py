@@ -17,8 +17,11 @@ usage = "%prog [options] file i j\n" \
     "    `j` is the index of the last results column."
 parser = OptionParser(usage=usage)
 parser.add_option("-r", "--regex", dest="regex",
-    help="A regular expression to find the relevant part of the option name",
-    default=None)
+        help="A regular expression to find the relevant part of the option name",
+        default=None)
+parser.add_option("-d", "--depth", dest="recursion_limit",
+        help="Integer. The maximum depth of recursion to use to break ties " \
+        "for last. Cannot be set less than 1.", default=None)
 (options, args) = parser.parse_args()
 
 # Usage message
@@ -69,7 +72,7 @@ class Vote(object):
         else:
             return None
 
-def instant_runoff(votes, verbose=True, recursion_limit=3):
+def instant_runoff(votes, verbose=True, recursion_limit=5):
     '''Actually does the instant-runoff process.'''
     n = len(votes)
     round = 1
@@ -107,15 +110,17 @@ def instant_runoff(votes, verbose=True, recursion_limit=3):
                 losers.append(k)
 
         # If we have one loser, it's easy to figure out who it is
-        if len(losers) == 1 or recursion_limit <= 0:
+        if len(losers) == 1:
             loser = losers[0]
 
-        # If we have multiple losers, use an instant runoff of just those to
-        # figure out who to eliminate
+        # Multiple losers, but out of recursion
+        elif len(losers) > 1 and recursion_limit == 0:
+            loser = losers[0]
+            print("WARNING: Loser picked arbitrarily because recursion " \
+                    "limit reached")
+
+        # Multiple losers, but we can recurse
         elif len(losers) > 1 and recursion_limit > 0:
-            if verbose:
-                print("NOTICE: Using recursive call to determine who to " \
-                    "eliminate.")
             sub_result = None
             for this_loser in losers:
                 votes_prime = []
@@ -123,16 +128,27 @@ def instant_runoff(votes, verbose=True, recursion_limit=3):
                     vote_prime = vote.dup()
                     vote_prime.remove(this_loser)
                     votes_prime.append(vote_prime)
-                this_sub_result = instant_runoff(votes_prime, verbose=False,
-                        recursion_limit=recursion_limit-1)[0]
+                this_sub_results = instant_runoff(votes_prime, verbose=False,
+                        recursion_limit=recursion_limit-1)
+                if this_sub_results != None and len(this_sub_results) >= 1:
+                    this_sub_result = this_sub_results[0]
+                else:
+                    this_sub_result = None
                 if sub_result == None:
                     sub_result = this_sub_result
                 elif sub_result != this_sub_result:
                     if verbose:
-                        print("WARNING: Winner will be different based on who " \
-                                "is eliminated now. Take results with grain " \
-                                "of salt")
-                    break
+                        print("ERROR: Instant-runoff failed. Winner " \
+                                "cannot be determined.")
+                    return None
+            else:
+                if sub_result == None:
+                    if verbose:
+                        print("ERROR: Instant-runoff failed. Winner " \
+                                "cannot be determined.")
+                    return None
+                elif verbose:
+                    print("Loser found here through recursive calls.")
             loser = losers[0]
 
         else:
@@ -175,4 +191,8 @@ with open(filename, 'r') as f:
     for line in reader:
         votes.append(Vote(titles, i, j, line))
 
-instant_runoff(votes)
+if options.recursion_limit != None and int(options.recursion_limit) >= 1:
+    recursion_limit = int(options.recursion_limit)
+    instant_runoff(votes, recursion_limit=recursion_limit)
+else:
+    instant_runoff(votes)
