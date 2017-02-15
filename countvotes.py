@@ -127,9 +127,7 @@ def instant_runoff(votes, verbose=True, recursion_limit=5, reckless=False):
 
         # Multiple losers, but out of recursion
         elif len(losers) > 1 and recursion_limit <= 0:
-            if verbose:
-                print("ERROR: Out of recursion and still cannot determine" \
-                        " winner.")
+            print("ERROR: Reached recursion limit.")
             return None
 
         # Multiple losers, but we can recurse
