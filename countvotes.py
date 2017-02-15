@@ -107,7 +107,7 @@ def instant_runoff(votes, verbose=True, recursion_limit=3):
                 losers.append(k)
 
         # If we have one loser, it's easy to figure out who it is
-        if len(losers) == 1:
+        if len(losers) == 1 or recursion_limit <= 0:
             loser = losers[0]
 
         # If we have multiple losers, use an instant runoff of just those to
@@ -128,14 +128,15 @@ def instant_runoff(votes, verbose=True, recursion_limit=3):
                 if sub_result == None:
                     sub_result = this_sub_result
                 elif sub_result != this_sub_result:
-                    print("WARNING: Winner will be different based on who " \
-                            "is eliminated now. Take results with grain " \
-                            "of salt")
+                    if verbose:
+                        print("WARNING: Winner will be different based on who " \
+                                "is eliminated now. Take results with grain " \
+                                "of salt")
                     break
             loser = losers[0]
 
         else:
-            print("ERROR: could not figure out who to eliminate")
+            print("ERROR: this should never happen")
             exit()
 
         # Eliminate loser
@@ -146,7 +147,8 @@ def instant_runoff(votes, verbose=True, recursion_limit=3):
             print("{} is eliminated.".format(loser))
         round += 1
 
-        print()
+        if verbose:
+            print()
 
 # Read CSV file
 with open(filename, 'r') as f:
