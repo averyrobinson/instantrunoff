@@ -18,7 +18,8 @@ usage = "%prog [options] file i j\n" \
 parser = OptionParser(usage=usage)
 parser.add_option("-p", "--pattern", dest="regex",
         help="A regular expression to find the relevant part of the option " \
-        "name.", default=None)
+        "name. By default uses \"(?<=\[).*(?=\])\", which works well with " \
+        "Google Forms.", default="(?<=\[).*(?=\])")
 parser.add_option("-d", "--depth", dest="recursion_limit",
         help="Integer. The maximum depth of recursion to use to break ties " \
         "for last. Cannot be set less than 1.", default=None)
@@ -185,7 +186,7 @@ with open(filename, 'r') as f:
     titles = title_line[i:j+1]
 
     # Apply regex if necessary
-    if options.regex != None:
+    if options.regex != None and len(options.regex) > 0:
         new_titles = []
         for title in titles:
             m = re.search(options.regex, title)
