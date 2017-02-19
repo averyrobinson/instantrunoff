@@ -66,21 +66,11 @@ class Vote(object):
         ret.preferences = self.preferences
         return ret
 
-    def filter(self, titles):
-        '''Produces a NEW Vote object with only titles in the preference list.'''
-        prefs_prime = list(filter(lambda t: t in titles, self.preferences))
-        copy = Vote(None, None, None, None, do_nothing=True)
-        copy.preferences = prefs_prime
-        if len(copy.preferences) > 0:
-            return copy
-        else:
-            return None
-
 def instant_runoff(votes, verbose=True, recursion_limit=5, reckless=False):
-    '''Actually does the instant-runoff process.'''
+    '''Actually does the instant-runoff process. Returns the name of the
+    winner.'''
     n = len(votes)
     round = 1
-    results = []
 
     # Reckless warning
     if reckless and verbose:
@@ -105,8 +95,7 @@ def instant_runoff(votes, verbose=True, recursion_limit=5, reckless=False):
             if v >= n // 2 + 1:
                 if verbose:
                     print("{} is the winner.".format(k))
-                results.insert(0, k)
-                return results
+                return k
         
         # Find last place
         lowest_vote_count = n
@@ -141,12 +130,8 @@ def instant_runoff(votes, verbose=True, recursion_limit=5, reckless=False):
                     vote_prime = vote.dup()
                     vote_prime.remove(this_loser)
                     votes_prime.append(vote_prime)
-                this_sub_results = instant_runoff(votes_prime, verbose=False,
+                this_sub_result = instant_runoff(votes_prime, verbose=False,
                         recursion_limit=recursion_limit-1, reckless=reckless)
-                if this_sub_results != None and len(this_sub_results) >= 1:
-                    this_sub_result = this_sub_results[0]
-                else:
-                    this_sub_result = None
                 if sub_result == None:
                     sub_result = this_sub_result
                 elif sub_result != this_sub_result:
@@ -169,7 +154,6 @@ def instant_runoff(votes, verbose=True, recursion_limit=5, reckless=False):
         # Eliminate loser
         for vote in votes:
             vote.remove(loser)
-        results.insert(0, loser)
         if verbose:
             print("{} is eliminated.".format(loser))
         round += 1
